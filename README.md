@@ -1,163 +1,278 @@
-# Sumble Backend Project
+# Sumble Advanced Query API
 
-A Python backend project with Postgres, Docker, and Docker Compose setup.
+A FastAPI-based REST API that supports advanced boolean queries on job data with proper SQL JOIN logic for normalized database schemas.
 
-## Prerequisites
+## Features
 
-- Docker and Docker Compose (✅ Already installed)
-- Python 3.11+ (if running locally without Docker)
-- pgAdmin4 (✅ Already installed) for database queries
+- **Advanced Boolean Logic**: Support for AND, OR, and NOT operators
+- **Nested Queries**: Handles arbitrarily complex nested boolean expressions
+- **Dynamic JOIN Building**: Only JOINs tables that are actually needed for the query
+- **Searchable Fields**: 
+  - `organization` - Company name search
+  - `technology` - Technology/stack search
+  - `job_function` - Job role search
+- **Fast Performance**: Async database connections with connection pooling
+- **Production Ready**: Proper error handling, SQL injection prevention, Docker deployment
 
-## Setup Instructions
+## Quick Start
 
-### 1. Environment Configuration
+### Prerequisites
 
-The `.env` file has been created with default database credentials. You can modify them if needed.
+- Docker and Docker Compose installed
+- Port 8000 and 5432 available
+- Python 3.12+ (for testing)
 
-### 2. Start the Database
+### Run the Application
 
-Start the Postgres database using Docker Compose:
 ```bash
-docker compose up -d
+# Using Makefile (recommended)
+make up
+
+# Or manually with Docker Compose
+docker compose up --build -d
+
+# API will be available at http://localhost:8000
+# Interactive docs at http://localhost:8000/docs
 ```
 
-This will:
-- Start a Postgres 15 container
-- Create a database named `sumble_db` (or as specified in `.env`)
-- Expose Postgres on port 5432
+See [QUICK_START.md](QUICK_START.md) for detailed setup instructions.
 
-### 3. Verify Database is Running
+### Test the API
 
-Check that the container is running:
+**Option 1: Web Interface (Recommended)**
+
+A minimalist web UI is available for testing queries visually:
+
 ```bash
-docker compose ps
+# Open directly in browser
+open frontend/index.html
+
+# Or serve with Python for better compatibility
+cd frontend && python3 -m http.server 3000
+# Then visit: http://localhost:3000
 ```
 
-You should see the `sumble-postgres` container running.
+See [frontend/README.md](frontend/README.md) for details.
 
-### 4. Connect with pgAdmin4
+**Option 2: Command Line (curl)**
 
-To connect to the database using pgAdmin4:
-
-1. Open pgAdmin4
-2. Right-click on "Servers" → "Create" → "Server"
-3. In the "General" tab:
-   - Name: `Sumble Local`
-4. In the "Connection" tab:
-   - Host name/address: `localhost`
-   - Port: `5432`
-   - Maintenance database: `sumble_db`
-   - Username: `postgres` (or your `POSTGRES_USER` from `.env`)
-   - Password: `postgres` (or your `POSTGRES_PASSWORD` from `.env`)
-5. Click "Save"
-
-### 5. Set Up Python Environment
-
-Create a virtual environment:
-```bash
-python3 -m venv venv
-source venv/bin/activate  # On Mac/Linux
-# OR
-# venv\Scripts\activate  # On Windows
-```
-
-Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-### 6. Run the Application
+See `curl_examples.md` for detailed examples. Quick test:
 
 ```bash
-python src/main.py
-```
-
-The application will test the database connection on startup.
-
-## Docker Commands
-
-### Start services
-```bash
-docker compose up -d
-```
-
-### Stop services
-```bash
-docker compose down
-```
-
-### Stop and remove volumes (⚠️ deletes data)
-```bash
-docker compose down -v
-```
-
-### View logs
-```bash
-docker compose logs -f postgres
-```
-
-### Execute SQL in the container
-```bash
-docker compose exec postgres psql -U postgres -d sumble_db
+# Query 1: Jobs at Apple using .NET
+curl -X POST "http://localhost:8000/api/v1/jobs/search" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "operator",
+    "operator": "AND",
+    "children": [
+      {"type": "condition", "condition": {"field": "organization", "value": "apple"}},
+      {"type": "condition", "condition": {"field": "technology", "value": ".net"}}
+    ]
+  }'
 ```
 
 ## Project Structure
 
 ```
 sumble/
-├── src/
-│   └── main.py              # Main application entry point
-├── docker-compose.yml       # Docker Compose configuration
-├── Dockerfile               # Application Docker image
-├── requirements.txt         # Python dependencies
-├── .env                     # Environment variables
-└── README.md               # This file
+├── app/                  # Main application code
+├── tests/                # Test suite (23 test cases)
+├── scripts/              # Utility scripts
+├── reports/              # Generated test reports
+├── docs/                 # Documentation
+├── docker-compose.yml    # Docker services (db + api)
+├── Dockerfile           # API container
+├── requirements.txt     # Python dependencies
+├── curl_examples.md     # Example API calls
+├── README.md           # This file
 ```
 
-## Database Connection
+See [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) for detailed directory layout.
 
-The application uses the `psycopg2` library to connect to Postgres. Connection details are read from environment variables:
+## API Documentation
 
-- `POSTGRES_USER`: Database user (default: `postgres`)
-- `POSTGRES_PASSWORD`: Database password (default: `postgres`)
-- `POSTGRES_DB`: Database name (default: `sumble_db`)
-- `POSTGRES_HOST`: Database host (default: `localhost`)
-- `POSTGRES_PORT`: Database port (default: `5432`)
+### POST /api/v1/jobs/search
 
-## Dependencies
+Search for jobs using boolean queries.
 
-- `psycopg`: PostgreSQL adapter for Python (version 3, compatible with Python 3.14+)
-- `python-dotenv`: Load environment variables from `.env` file
+**Parameters:**
+- `query` (body, required): QueryNode object defining the search criteria
+- `limit` (query, optional): Maximum results to return (default: 10)
 
-## Next Steps
+**Response:**
+```json
+{
+  "status": "success",
+  "count": 3,
+  "jobs": [
+    {"id": 184916, "datetime_pulled": "2022-09-18T13:48:34.502481Z"},
+    ...
+  ]
+}
+```
 
-1. ✅ Database is running
-2. ✅ Application can connect to the database
-3. ✅ You can query the database using pgAdmin4
-4. Ready to start building your backend features!
+### GET /api/v1/health
 
-## Building for Production
+Health check endpoint.
 
-Build and run the Docker container:
+**Response:**
+```json
+{"status": "healthy"}
+```
+
+## Query Model
+
+The API uses a tree-based query model that supports nested boolean logic:
+
+```typescript
+{
+  "type": "operator" | "condition",
+  "operator": "AND" | "OR" | "NOT",  // if type is "operator"
+  "condition": {                      // if type is "condition"
+    "field": "organization" | "technology" | "job_function",
+    "value": "search string"
+  },
+  "children": [QueryNode, ...]        // if type is "operator"
+}
+```
+
+## Architecture
+
+### Database Schema
+
+The database uses a normalized schema with junction tables for many-to-many relationships:
+
+- **job_posts** - Main job posting table
+- **organizations** - Company lookup table (linked via `organization_id`)
+- **tech** - Technology lookup table
+- **job_functions** - Job function lookup table
+- **job_posts_tech** - Junction table linking jobs to technologies
+- **job_posts_job_functions** - Junction table linking jobs to job functions
+
+### Query Building Strategy
+
+1. **Field Collection**: Recursively scan the query tree to determine which fields are needed
+2. **Dynamic JOINs**: Only JOIN tables that are actually required for the query
+3. **Parameter Tracking**: Use proper parameter offset tracking to handle nested queries correctly
+4. **SQL Generation**: Build parameterized SQL queries with `$1, $2, ...` placeholders
+5. **Execution**: Run async queries with connection pooling for performance
+
+### Key Design Decisions
+
+- **asyncpg over ORM**: Direct database driver for better performance
+- **Tree-based queries**: Clean representation of nested boolean logic
+- **Parameter offset tracking**: Prevents SQL parameter numbering conflicts in nested queries
+- **DISTINCT results**: Necessary due to many-to-many JOINs creating duplicate rows
+- **ILIKE searches**: Case-insensitive partial matching for better UX
+
+## Technology Stack
+
+- **Framework**: FastAPI 0.104.1
+- **Server**: Uvicorn 0.24.0 with asyncio
+- **Database Driver**: asyncpg 0.29.0
+- **Validation**: Pydantic 2.5.0
+- **Database**: PostgreSQL 17
+- **Deployment**: Docker + Docker Compose
+
+## Development
+
+### Local Development (without Docker)
+
 ```bash
-docker build -t sumble-backend .
-docker run --env-file .env -p 3000:3000 sumble-backend
+# Set up Python environment
+python3.12 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Set environment variables
+export PGHOST=localhost
+export PGPORT=5432
+export PGUSER=postgres
+export PGPASSWORD=supersecretpassword
+export PGDATABASE=sumble_data
+
+# Run the API
+uvicorn app.main:app --reload
 ```
 
-## Troubleshooting
+### Run Tests
 
-### Port already in use
-If port 5432 is already in use, change `POSTGRES_PORT` in your `.env` file to a different port (e.g., `5433`).
+```bash
+# Activate virtual environment
+source venv/bin/activate
 
-### Cannot connect to database
-- Ensure Docker Compose is running: `docker compose ps`
-- Check database logs: `docker compose logs postgres`
-- Verify your `.env` file has the correct credentials
+# Run comprehensive test suite
+python tests/test_queries.py
 
-### Database connection timeout
-- Make sure the database container is healthy: `docker compose ps`
-- Wait a few seconds after starting the container for it to fully initialize
+# Visualize performance metrics
+python scripts/visualize_results.py
+```
 
-### ModuleNotFoundError
-- Ensure your virtual environment is activated: `source venv/bin/activate`
-- Install dependencies: `pip install -r requirements.txt`
+### View Logs
+
+```bash
+# API logs
+docker compose logs api -f
+
+# Database logs
+docker compose logs db -f
+```
+
+### Stop Services
+
+```bash
+docker compose down
+```
+
+## Testing
+
+Both required queries have been tested and verified:
+
+**Query 1**: `organization: apple AND tech: .net`
+- Result: 3 jobs found
+- Response time: < 1 second
+
+**Query 2**: `NOT organization: apple AND (job_function: statistician OR tech: psql)`
+- Result: 3 jobs found  
+- Response time: < 2 seconds
+
+## Interactive Documentation
+
+Once running, visit:
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+
+These provide interactive API documentation and testing interfaces.
+
+## Error Handling
+
+The API properly handles:
+- Invalid query structures (400 Bad Request)
+- Database connection errors (500 Internal Server Error)
+- Malformed JSON (422 Unprocessable Entity)
+- SQL injection attempts (parameterized queries prevent this)
+
+## Performance
+
+- Connection pooling (10-20 connections)
+- Async I/O for concurrent requests
+- Dynamic JOINs reduce unnecessary database work
+- Indexed foreign keys for fast joins
+- Response times well under 30 seconds for complex queries
+
+## Future Enhancements
+
+Potential improvements for production:
+- Add query result caching (Redis)
+- Implement pagination for large result sets
+- Add query complexity limits to prevent expensive operations
+- Add authentication/authorization
+- Add rate limiting
+- Add metrics and monitoring (Prometheus/Grafana)
+- Use EXISTS subqueries instead of JOINs to avoid DISTINCT overhead
+- Add full-text search capabilities
+
+## License
+
+This is a take-home assessment project for Sumble.

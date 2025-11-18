@@ -1,23 +1,30 @@
-version: '3.8'
-
 services:
-  postgres:
-    image: postgres:15-alpine
-    container_name: sumble-postgres
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-sumble_db}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+  db:
+    image: nzsne8pttnh8wrpu/p2ckp9ddret2arc2
+    container_name: sumble-db
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 1s
       timeout: 5s
       retries: 5
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: supersecretpassword
 
-volumes:
-  postgres_data:
-
+  api:
+    build: .
+    container_name: sumble-api
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      - PGHOST=db
+      - PGPORT=5432
+      - PGUSER=postgres
+      - PGPASSWORD=supersecretpassword
+      - PGDATABASE=sumble_data
+    volumes:
+      - ./app:/app/app  # For development hot reload

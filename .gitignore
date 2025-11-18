@@ -1,3 +1,4 @@
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -6,11 +7,24 @@ __pycache__/
 venv/
 env/
 ENV/
+*.egg-info/
+dist/
+build/
+
+# Environment
 .env
-*.log
+
+# IDE
 .DS_Store
 .vscode/
 .idea/
-dist/
-build/
-*.egg-info/
+
+# Test artifacts
+reports/test_results.json
+*.log
+
+# Docker volumes
+postgres_data/
+
+# Frontend is optional demo
+# (not gitignored - it's part of the project)
