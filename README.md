@@ -88,8 +88,6 @@ sumble/
 ├── README.md           # This file
 ```
 
-See [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) for detailed directory layout.
-
 ## API Documentation
 
 ### POST /api/v1/jobs/search
@@ -138,6 +136,8 @@ The API uses a tree-based query model that supports nested boolean logic:
 ```
 
 ## Architecture
+
+[ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ### Database Schema
 
@@ -272,7 +272,3 @@ Potential improvements for production:
 - Add metrics and monitoring (Prometheus/Grafana)
 - Use EXISTS subqueries instead of JOINs to avoid DISTINCT overhead
 - Add full-text search capabilities
-
-## License
-
-This is a take-home assessment project for Sumble.
